@@ -3,94 +3,92 @@ import random
 import time
 
 # 1. ページの設定
-st.set_page_config(page_title="最強経営シミュレーター", layout="centered")
+st.set_page_config(page_title="本格経営シミュレーター", layout="centered")
 
 # 2. データの初期化
 if 'money' not in st.session_state:
-    st.session_state.money = 5000
-    st.session_state.staff = 0
-    st.session_state.share = 5
+    st.session_state.money = 10000000 
+    st.session_state.staff = 1         
+    st.session_state.share = 1
     st.session_state.month = 1
-    st.session_state.last_time = time.time() # 前回の月更新時間
-    st.session_state.is_listed = False
-    st.session_state.logs = ["ゲーム開始！20分ごとに月が替わります。"]
+    st.session_state.last_time = time.time()
+    st.session_state.last_click_time = time.time() # クリック監視用
+    st.session_state.logs = ["会社を設立しました！"]
+    st.session_state.is_banned = False # バン状態
 
-# 定数設定
-MONTH_DURATION = 1200  # 1ヶ月 = 20分 (1200秒)
+# 3. オートクリッカー検知ロジック
+def check_click_speed():
+    current = time.time()
+    interval = current - st.session_state.last_click_time
+    st.session_state.last_click_time = current
+    
+    # 0.1秒以下の間隔でクリックされたら不正とみなす
+    if interval < 0.1:
+        st.session_state.is_banned = True
+        return True
+    return False
 
-# 3. 時間経過による月更新チェック
-current_time = time.time()
-elapsed = current_time - st.session_state.last_time
-remaining = max(0, int(MONTH_DURATION - elapsed))
+# 不正検知時のリセット画面
+if st.session_state.is_banned:
+    st.error("🚨 【不正検知】オートクリッカーの使用が疑われました。")
+    st.warning("公平なプレイを保つため、全データをリセットしました。")
+    if st.button("反省して再スタートする"):
+        for key in st.session_state.keys():
+            del st.session_state[key]
+        st.rerun()
+    st.stop() # ここで処理を止める
 
-# 月更新のロジックを関数化
+# --- (以下、前回の月更新ロジックなどはそのまま継続) ---
+
 def next_month():
     s = st.session_state.staff
-    # --- 収益計算 ---
-    base_income = 0
-    if 1 <= s <= 10: base_income = 100
-    elif 11 <= s <= 50: base_income = 1000
-    elif 51 <= s <= 100: base_income = 10000
-    elif s > 100: base_income = s * 100
-    
-    income = int(base_income * (1 + st.session_state.share / 100))
-    
-    # --- 経費計算 ---
-    salary_cost = s * 50  # 人件費: 1人50円
-    office_cost = 500     # 諸経費(固定費)
-    tax = int(income * 0.3) if income > 0 else 0
-    
-    total_cost = salary_cost + office_cost + tax
-    st.session_state.money += (income - total_cost)
+    base_unit = 500000 if s <= 10 else 800000
+    total_sales = int(s * base_unit * (1 + st.session_state.share / 100))
+    personnel_expenses = int(s * 300000 * 1.15)
+    rent_office = int(s * 30000) + 100000
+    profit = total_sales - (personnel_expenses + rent_office)
+    if profit > 0: profit -= int(profit * 0.3)
+    st.session_state.money += profit
     st.session_state.month += 1
     st.session_state.last_time = time.time()
-    
-    st.session_state.logs.insert(0, f"【{st.session_state.month-1}月末決算】収益:{income}円 / 経費:{total_cost}円(人件費:{salary_cost}含む)")
+    st.session_state.logs.insert(0, f"【{st.session_state.month-1}月決算】純利益:{profit:,}円")
 
-# 20分経過していたら自動更新
-if elapsed >= MONTH_DURATION:
+elapsed = time.time() - st.session_state.last_time
+if elapsed >= 1200:
     next_month()
     st.rerun()
 
 # 4. 画面表示
-st.title(f"🏢 会社経営シミュレーター ({st.session_state.month}ヶ月目)")
-st.caption(f"次の月まであと: {remaining // 60}分 {remaining % 60}秒")
-st.progress(1.0 - (remaining / MONTH_DURATION))
-
+st.title(f"🏢 経営シミュレーター ({st.session_state.month}ヶ月目)")
 col1, col2, col3 = st.columns(3)
-col1.metric("総資産", f"{st.session_state.money:,}円")
+col1.metric("現預金", f"{st.session_state.money:,}円")
 col2.metric("市場シェア", f"{st.session_state.share}%")
 col3.metric("従業員数", f"{st.session_state.staff}名")
 
-# 5. アクションボタン
-st.subheader("実行アクション")
-c1, c2, c3 = st.columns(3)
+# 5. アクション（クリック時にスピードチェックを入れる）
+st.subheader("経営判断")
+c1, c2 = st.columns(2)
+
 with c1:
-    if st.button("営業活動 (+100円)"):
-        st.session_state.money += 100
-        st.session_state.logs.insert(0, "営業で100円稼ぎました。")
-with c2:
-    if st.button("社員採用 (1,000円)"):
-        if st.session_state.money >= 1000:
-            st.session_state.money -= 1000
+    if st.button("採用を出す (50万)"):
+        if check_click_speed(): st.rerun() # 検知
+        if st.session_state.money >= 500000:
+            st.session_state.money -= 500000
             st.session_state.staff += 1
             st.rerun()
-with c3:
-    if st.button("商品開発 (5,000円)"):
-        if st.session_state.money >= 5000:
-            st.session_state.money -= 5000
-            st.session_state.share += random.randint(1, 10)
+
+with c2:
+    if st.button("マーケティング (100万)"):
+        if check_click_speed(): st.rerun() # 検知
+        if st.session_state.money >= 1000000:
+            st.session_state.money -= 1000000
+            st.session_state.share += random.randint(1, 3)
             st.rerun()
 
-if st.button("⏩ 手動で月を進める（テスト用）"):
-    next_month()
-    st.rerun()
-
-# 6. 履歴
-st.subheader("経営履歴")
+st.divider()
+st.subheader("月次報告ログ")
 for log in st.session_state.logs[:5]:
-    st.text(log)
+    st.write(log)
 
-# 画面を定期的に更新（10秒おきに再描画してタイマーを進める）
 time.sleep(1)
 st.rerun()
