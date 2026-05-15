@@ -1,0 +1,3 @@
+if st.button("⏩ 翌月へスキップ (デバッグ用)"):
+    st.session_state.last_time -= MONTH_DURATION
+    st.rerun()
