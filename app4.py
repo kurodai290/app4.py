@@ -28,10 +28,12 @@ if st.session_state.money < -10000000:
         st.rerun()
     st.stop()
 
-# 4. 月更新・決算処理
+# 4. 月更新・決算処理（関数化してどこからでも呼べるようにする）
 def process_settlement():
     s = st.session_state.staff
+    # 収益計算
     sales = int(s * 550000 * (1 + st.session_state.share / 100))
+    # 利息計算
     interest = int(st.session_state.debt * 0.01)
     costs = int(s * 450000) + 200000 + interest
     profit = sales - costs
@@ -42,6 +44,7 @@ def process_settlement():
     st.session_state.last_time = time.time()
     st.session_state.logs.insert(0, f"📊 {st.session_state.start_date.strftime('%Y年%m月')} 決算報告：純利益 {profit:,}円")
 
+# 自動時間経過チェック
 elapsed = time.time() - st.session_state.last_time
 if elapsed >= MONTH_DURATION:
     process_settlement()
@@ -64,7 +67,7 @@ c4.metric("従業員", f"{st.session_state.staff}名")
 
 # 6. 戦略コマンド
 st.subheader("🛠️ 経営戦略")
-tab1, tab2, tab3 = st.tabs(["人事・広報", "銀行・財務", "M&A（買収）"])
+tab1, tab2, tab3, tab4 = st.tabs(["人事・広報", "銀行・財務", "M&A（買収）", "⏳ スキップ"])
 
 with tab1:
     col_a, col_b = st.columns(2)
@@ -99,22 +102,18 @@ with tab3:
             st.balloons()
             st.rerun()
 
-# 7. 隠しコマンド
-st.divider()
-with st.expander("🛠️ 管理用デバッグコンソール"):
-    cheat = st.text_input("コードを入力", type="password")
-    if cheat == "give me money":
-        if st.button("10万円入手"):
-            st.session_state.money += 100000
-            st.rerun()
-    elif cheat == "skip":
-        if st.button("翌月へスキップ"):
-            process_settlement()
-            st.rerun()
+# ★ 追加：スキップ機能タブ ★
+with tab4:
+    st.write("時間を強制的に進めて、即座に次月の決算を行います。")
+    if st.button("⏩ 翌月までスキップ実行"):
+        process_settlement()
+        st.rerun()
 
+st.divider()
 st.subheader("ニュースログ")
 for log in st.session_state.logs[:5]:
     st.write(log)
 
+# 1秒ごとに画面更新
 time.sleep(1)
 st.rerun()
