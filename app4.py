@@ -1,66 +1,95 @@
-import time
+import random
 
-def start_game():
-    print("--- げぇむ『てんびん』を開始します ---")
-    print("ルール: 0〜100の中から数字を選んでください。")
-    print("勝者: 全員の平均値に『0.8』を掛けた値に最も近い人。")
-    print("脱落: ポイントが -10 になると『秤』から水が溢れます。\n")
+class EnterpriseGame:
+    def __init__(self):
+        self.money = 5000
+        self.debt = 0           # 借金
+        self.staff = {"平社員": 0, "部長": 0, "役員": 0}
+        self.market_share = 5
+        self.is_listed = False  # 上場しているか
+        self.turn = 1
 
-    # プレイヤー設定
-    num_players = int(input("参加人数を入力してください: "))
-    players = {}
-    for i in range(num_players):
-        name = input(f"プレイヤー{i+1}の名前: ")
-        players[name] = 0  # 初期ポイント
+    def calculate_income(self):
+        # 基礎収益
+        base = (self.staff["平社員"]*50 + self.staff["部長"]*300 + self.staff["役員"]*1500)
+        share_bonus = 1 + (self.market_share / 100)
+        return int(base * share_bonus)
 
-    round_count = 1
+    def handle_taxes(self, profit):
+        """税金システム：利益の30%を徴収"""
+        if profit > 0:
+            tax = int(profit * 0.3)
+            self.money -= tax
+            return tax
+        return 0
 
-    while len(players) > 1:
-        print(f"\n--- 第 {round_count} 回戦 ---")
-        choices = {}
+    def run_bank(self):
+        """銀行融資：お金を借りるが利息が発生"""
+        print(f"\n--- 銀行窓口 (現在の借金: {self.debt}円) ---")
+        print("1: 10,000円借りる (利息10%)  2: 借金を全額返済する")
+        choice = input("選択: ")
+        if choice == "1":
+            self.money += 10000
+            self.debt += 11000 # 利息込み
+            return "10,000円を借りました。返済義務は11,000円です。"
+        elif choice == "2":
+            if self.money >= self.debt:
+                self.money -= self.debt
+                self.debt = 0
+                return "借金を完済しました！"
+            else:
+                return "返済資金が足りません。"
+        return "戻ります。"
 
-        # 入力フェーズ
-        for name in players.keys():
-            while True:
-                try:
-                    val = float(input(f"[{name}] 0〜100の数字を入力: "))
-                    if 0 <= val <= 100:
-                        choices[name] = val
-                        break
-                    print("0から100の間で入力してください。")
-                except ValueError:
-                    print("数字を入力してください。")
+    def run_ipo(self):
+        """株式上場：厳しい条件をクリアして大金を得る"""
+        if self.is_listed: return "既に上場しています。"
+        
+        print("\n--- 証券取引所 (IPO審査) ---")
+        print("条件: 資産50,000円以上 かつ シェア30%以上")
+        if self.money >= 50000 and self.market_share >= 30:
+            choice = input("上場しますか？ (y/n): ")
+            if choice == "y":
+                ipo_fund = 200000
+                self.money += ipo_fund
+                self.is_listed = True
+                return f"祝・上場！ 上場益として {ipo_fund}円 が払い込まれました！"
+        else:
+            return "条件を満たしていません。"
+        return "上場を見送りました。"
 
-        # 計算フェーズ
-        average = sum(choices.values()) / len(choices)
-        target = average * 0.8
-        print(f"\n集計中...")
-        time.sleep(1)
-        print(f"平均値: {average:.2f}")
-        print(f"設定数値 (平均×0.8): {target:.2f}")
+    def show_status(self):
+        print(f"\n{'='*40}")
+        print(f"第 {self.turn} 期 {' [上場企業]' if self.is_listed else ''}")
+        print(f"【資産】 {self.money}円  【借金】 {self.debt}円")
+        print(f"【シェア】 {self.market_share}%  【人員】 {sum(self.staff.values())}名")
+        print(f"{'='*40}")
 
-        # 勝敗判定
-        winner = min(choices, key=lambda x: abs(choices[x] - target))
-        print(f"このラウンドの勝者: {winner} (選択値: {choices[winner]})")
+    def play(self):
+        while True:
+            self.show_status()
+            print("1:人員 2:営業/開発 3:銀行(融資) 4:IPO(上場) 5:次へ q:終了")
+            cmd = input("アクションを選択: ")
 
-        # 敗者にペナルティ (-1ポイント)
-        for name in list(players.keys()):
-            if name != winner:
-                players[name] -= 1
-                print(f"{name}: {players[name]}ポイント")
+            if cmd == "q": break
+            
+            # メインアクション処理
+            if cmd == "3": print(self.run_bank())
+            elif cmd == "4": print(self.run_ipo())
+            # (省略：1と2はこれまでの雇用や営業のコードが入るイメージ)
 
-        # 脱落チェック
-        eliminated = [name for name, score in players.items() if score <= -10]
-        for name in eliminated:
-            print(f"!!! {name} が脱落しました (溶解) !!!")
-            del players[name]
+            # 期末処理
+            income = self.calculate_income()
+            tax = self.handle_taxes(income)
+            self.money += (income - tax)
+            
+            if income > 0:
+                print(f"今期の利益: {income}円 (うち税金: {tax}円) を計上しました。")
+            
+            self.turn += 1
+            if self.money < 0:
+                print("【破産】 資金が底をつきました。ゲームオーバー。")
+                break
 
-        if len(players) == 1:
-            final_winner = list(players.keys())[0]
-            print(f"\n🎉 げぇむくりあ：勝者は {final_winner} です！")
-            break
-
-        round_count += 1
-
-if __name__ == "__main__":
-    start_game()
+# ゲーム開始
+# EnterpriseGame().play() 
